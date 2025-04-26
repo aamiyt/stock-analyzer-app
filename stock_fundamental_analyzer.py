@@ -4,20 +4,26 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="Stock Fundamental Analyzer", layout="wide")
-st.title("📈 Stock Fundamental Analyzer with Comparison & Charts")
+st.title("📈 Stock Fundamental Analyzer with Multi-Stock Comparison")
 
 # Input stock symbols
-col1, col2 = st.columns(2)
-with col1:
-    symbol1 = st.text_input("Enter First Stock Symbol (e.g., AAPL):", value="AAPL").upper()
-with col2:
-    symbol2 = st.text_input("Enter Second Stock Symbol (optional):", value="TSLA").upper()
+symbols_input = st.text_input("Enter Stock Symbols (comma-separated, e.g., AAPL, TSLA, MSFT):", value="AAPL, TSLA")
+symbols = [s.strip().upper() for s in symbols_input.split(',') if s.strip()]
 
 def fetch_data(symbol):
     stock = yf.Ticker(symbol)
     info = stock.info
     history = stock.history(period="1y")
     return info, history
+
+def calculate_ratios(info):
+    try:
+        roe = info.get('netIncomeToCommon', 0) / info.get('totalStockholderEquity', 1)
+        roa = info.get('netIncomeToCommon', 0) / info.get('totalAssets', 1)
+        debt_equity = info.get('totalDebt', 0) / info.get('totalStockholderEquity', 1)
+        return roe, roa, debt_equity
+    except:
+        return None, None, None
 
 def show_fundamentals(info, symbol):
     st.subheader(f"{info.get('longName', 'N/A')} ({symbol})")
@@ -26,7 +32,7 @@ def show_fundamentals(info, symbol):
                 f"*Market Cap:* ${info.get('marketCap', 0):,}")
 
     st.markdown("#### Key Financial Metrics")
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("Current Price", f"${info.get('currentPrice', 0)}")
         st.metric("52-Week High", f"${info.get('fiftyTwoWeekHigh', 0)}")
@@ -35,11 +41,21 @@ def show_fundamentals(info, symbol):
         st.metric("EPS", info.get('trailingEps', 'N/A'))
         st.metric("PE Ratio", info.get('trailingPE', 'N/A'))
         st.metric("Dividend Yield", str(info.get('dividendYield', 'N/A')))
+    with col3:
+        roe, roa, debt_equity = calculate_ratios(info)
+        st.metric("ROE", f"{roe:.2%}" if roe else "N/A")
+        st.metric("ROA", f"{roa:.2%}" if roa else "N/A")
+        st.metric("Debt/Equity", f"{debt_equity:.2f}" if debt_equity else "N/A")
 
     st.markdown("#### Financials")
     st.write(f"*Total Revenue:* ${info.get('totalRevenue', 0):,}")
-    st.write(f"*Gross Profit:* ${info.get('grossProfits', 0):,}")
+    st.write(f"*Gross Profit:* ${info.get('grossProfit', 0):,}")
     st.write(f"*Net Income:* ${info.get('netIncomeToCommon', 0):,}")
+
+    st.markdown("#### Analyst Info")
+    st.write(f"*Recommendation:* {info.get('recommendationKey', 'N/A').capitalize()}")
+    st.write(f"*Target Mean Price:* ${info.get('targetMeanPrice', 'N/A')}")
+    st.write(f"*Price Target Range:* ${info.get('targetLowPrice', 'N/A')} - ${info.get('targetHighPrice', 'N/A')}")
 
     st.markdown("#### Description")
     st.info(info.get('longBusinessSummary', 'Not Available'))
@@ -66,6 +82,7 @@ def plot_financials(info, symbol):
     st.pyplot(fig)
 
 def download_info(info, symbol):
+    roe, roa, debt_equity = calculate_ratios(info)
     data = {
         "Symbol": symbol,
         "Name": info.get('longName', 'N/A'),
@@ -74,32 +91,27 @@ def download_info(info, symbol):
         "EPS": info.get('trailingEps', 'N/A'),
         "Revenue": info.get('totalRevenue', 'N/A'),
         "Net Income": info.get('netIncomeToCommon', 'N/A'),
+        "ROE": roe,
+        "ROA": roa,
+        "Debt/Equity": debt_equity,
+        "Target Price": info.get('targetMeanPrice', 'N/A'),
+        "Recommendation": info.get('recommendationKey', 'N/A')
     }
     df = pd.DataFrame([data])
     csv = df.to_csv(index=False)
-    st.download_button(label="📄 Download Summary CSV", data=csv, file_name=f"{symbol}_fundamentals.csv", mime='text/csv')
+    st.download_button(label=f"📄 Download {symbol} Summary", data=csv,
+                       file_name=f"{symbol}_fundamentals.csv", mime='text/csv')
 
-# Show first stock
-if symbol1:
-    try:
-        info1, history1 = fetch_data(symbol1)
-        st.header(f"🔍 Analysis: {symbol1}")
-        show_fundamentals(info1, symbol1)
-        plot_price(history1, symbol1)
-        plot_financials(info1, symbol1)
-        download_info(info1, symbol1)
-    except Exception as e:
-        st.error(f"Error fetching data for {symbol1}: {e}")
-
-# Show second stock if entered
-if symbol2 and symbol2 != symbol1:
+# Display all stocks
+for symbol in symbols:
     st.markdown("---")
     try:
-        info2, history2 = fetch_data(symbol2)
-        st.header(f"🔍 Analysis: {symbol2}")
-        show_fundamentals(info2, symbol2)
-        plot_price(history2, symbol2)
-        plot_financials(info2, symbol2)
-        download_info(info2, symbol2)
+        info, history = fetch_data(symbol)
+        st.header(f"🔍 Analysis: {symbol}")
+        show_fundamentals(info, symbol)
+        plot_price(history, symbol)
+        plot_financials(info, symbol)
+        download_info(info, symbol)
     except Exception as e:
-        st.error(f"Error fetching data for {symbol2}: {e}")
+        st.error(f"Error fetching data for {symbol}: {e}")
+
