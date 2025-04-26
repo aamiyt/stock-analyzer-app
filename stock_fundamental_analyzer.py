@@ -1,4 +1,3 @@
-# Stock Screener Lite App - Streamlit
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -7,7 +6,7 @@ import matplotlib.pyplot as plt
 st.set_page_config(page_title="Stock Screener App", layout="wide")
 st.title("📈 Stock Screener Lite - Analyze, Compare, Filter Stocks")
 
-# Input for Stock Symbol
+# Input for Stock Symbols
 symbols_input = st.text_input("Enter Stock Symbols (comma-separated, e.g., TCS, INFY, RELIANCE):", value="TCS, INFY")
 symbols = [s.strip().upper() for s in symbols_input.split(',') if s.strip()]
 
@@ -16,6 +15,13 @@ st.sidebar.header("🔍 Screener Filters")
 min_roe = st.sidebar.number_input("Minimum ROE (%)", value=15)
 max_debt_equity = st.sidebar.number_input("Maximum Debt/Equity", value=1.0)
 min_market_cap = st.sidebar.number_input("Minimum Market Cap (Cr)", value=1000)
+
+# List of Indian Stocks (Example: Add real NSE/BSE symbols)
+indian_stocks = [
+    "TCS", "INFY", "RELIANCE", "HDFCBANK", "ICICIBANK", "HINDUNILVR", "BHARTIARTL", "KOTAKBANK", 
+    "ITC", "LT", "M&M", "BAJFINANCE", "SUNPHARMA", "ULTRACEMCO", "NTPC", "HDFC", "ASIANPAINT", "TECHM"
+    # Add more symbols as needed
+]
 
 def fetch_stock(symbol):
     stock = yf.Ticker(symbol)
@@ -50,6 +56,10 @@ def show_stock_info(info, symbol):
 filtered_stocks = []
 
 for symbol in symbols:
+    if symbol not in indian_stocks:
+        st.error(f"{symbol} is not an Indian stock. Please enter a valid Indian stock symbol.")
+        continue
+    
     try:
         info = fetch_stock(symbol)
 
